@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Applier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Schibsted+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Carbon-copy palette: cool desk, white sheet, navy ink, one yellow marker for the hook. */
+  :root {
+    --desk: #E9EDF4;
+    --sheet: #FBFCFE;
+    --ink: #1B2A4A;
+    --ink-soft: #56627F;
+    --rule: #CBD3E1;
+    --carbon: #3446C9;
+    --marker: #F7E46A;
+    --ok: #2D7A57;
+    --warn: #A8501F;
+    --bad: #B42335;
+    --shadow: 0 1px 0 var(--rule), 0 18px 40px -24px rgba(27, 42, 74, .45);
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "Schibsted Grotesk", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --desk: #121A2B;
+      --sheet: #1A2438;
+      --ink: #E3E8F3;
+      --ink-soft: #97A3BE;
+      --rule: #2C3954;
+      --carbon: #A3AEFF;
+      --marker: rgba(226, 200, 66, .5);
+      --ok: #5BC08F;
+      --warn: #E8A16B;
+      --bad: #FF8593;
+      --shadow: 0 1px 0 var(--rule), 0 18px 40px -24px rgba(0, 0, 0, .7);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; overflow-x: hidden; background: var(--desk); color: var(--ink); font: 400 15px/1.5 var(--sans); }
+  a { color: var(--carbon); text-underline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--carbon); outline-offset: 2px; }
+  button, select, input { font: inherit; color: inherit; }
+
+  .app { display: grid; grid-template-columns: 284px minmax(0, 1fr); min-height: 100vh; }
+
+  /* ---------- the queue ---------- */
+  .queue { position: sticky; top: 0; height: 100vh; min-width: 0; display: flex; flex-direction: column;
+           border-right: 1px solid var(--rule); padding: 22px 0 18px; }
+  .brand { font-weight: 700; font-size: 17px; padding: 0 22px; letter-spacing: -.01em; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 12px 22px 16px; font-size: 14px;
+          border-bottom: 1px solid var(--rule); }
+  .tabs a { color: var(--ink-soft); text-decoration: none; padding-bottom: 2px; }
+  .tabs a[aria-current="page"] { color: var(--ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--carbon); }
+  .tabs .n { font-variant-numeric: tabular-nums; }
+  .leads { position: relative; list-style: none; margin: 0; padding: 8px 0; overflow-y: auto; flex: 1; }
+  .leads a { display: block; padding: 10px 22px 10px 19px; border-left: 3px solid transparent;
+             color: inherit; text-decoration: none; }
+  .leads a:hover { background: color-mix(in srgb, var(--sheet) 55%, transparent); }
+  .leads a[aria-current="true"] { background: var(--sheet); border-left-color: var(--carbon); }
+  .leads .name { font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .leads .meta { font-size: 13px; color: var(--ink-soft); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--carbon); flex: none; }
+  .leads .is-done .name, .leads .is-skipped .name { color: var(--ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+  .runs { padding: 14px 22px 0; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-soft); }
+  .runs p { margin: 0 0 3px; }
+  .runs .failed { color: var(--bad); font-weight: 500; }
+  .keys { margin-top: 10px; }
+  kbd { font: 500 12px var(--sans); border: 1px solid var(--rule); border-bottom-width: 2px;
+        border-radius: 4px; padding: 0 5px; color: var(--ink); background: var(--sheet); }
+
+  /* ---------- one lead ---------- */
+  main { padding: 34px clamp(16px, 4vw, 56px) 0; min-width: 0; }
+  .lead[hidden] { display: none; }
+  .lead-head h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.02em; margin: 0; font-weight: 700; }
+  .lead-head h1 a { color: inherit; text-decoration: none; }
+  .lead-head h1 a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 8px 0 26px; color: var(--ink-soft); font-size: 14px; }
+  .facts .fit { color: var(--ink); font-weight: 500; }
+
+  .proof { display: grid; grid-template-columns: minmax(0, 660px) minmax(220px, 290px); gap: 36px; align-items: start; }
+
+  .sheet { background: var(--sheet); box-shadow: var(--shadow); border-radius: 3px; padding: 26px 40px 32px; }
+  .field { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+           border-bottom: 1px solid var(--rule); padding: 7px 0; font-size: 14px; }
+  .field > span { color: var(--ink-soft); }
+  .field select, .field input { width: 100%; border: 0; background: transparent; padding: 4px 0; min-width: 0; }
+  .field input { font-weight: 500; }
+  .status-verified { color: var(--ok); } .status-likely { color: var(--carbon); }
+  .status-guessed { color: var(--warn); } .status-none { color: var(--bad); }
+  .tag { font-size: 13px; white-space: nowrap; }
+  .letter { font: 400 18px/1.62 var(--serif); margin-top: 22px; white-space: pre-wrap; outline: none;
+            max-width: 62ch; min-height: 12em; }
+  .letter:focus-visible { outline: 1px dashed var(--rule); outline-offset: 10px; }
+  .letter mark { color: inherit; background: linear-gradient(transparent 52%, var(--marker) 52%, var(--marker) 94%, transparent 94%);
+                 -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .signature { font: 400 16px/1.55 var(--serif); color: var(--ink-soft); white-space: pre-wrap; margin-top: 18px; }
+
+  .margin { font-size: 14px; display: grid; gap: 22px; }
+  .margin h2 { font-size: 14px; margin: 0 0 6px; font-weight: 700; }
+  .margin p { margin: 0; }
+  .why { padding-left: 12px; border-left: 4px solid var(--marker); }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .checks label { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; cursor: pointer; }
+  .checks input { margin: 3px 0 0; accent-color: var(--ok); }
+  .checks input:checked + span { color: var(--ink-soft); text-decoration: line-through; }
+  .margin .notes { width: 100%; border: 1px solid var(--rule); border-radius: 3px; background: var(--sheet); padding: 7px 9px; }
+  .soft { color: var(--ink-soft); }
+
+  .actions { position: sticky; bottom: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+             margin: 22px -4px 0; padding: 12px 4px; background: var(--desk); border-top: 1px solid var(--rule); }
+  .actions .spacer { flex: 1; }
+  .btn { border: 1px solid var(--rule); background: var(--sheet); border-radius: 6px; padding: 7px 13px; cursor: pointer;
+         text-decoration: none; color: var(--ink); font-size: 14px; white-space: nowrap; }
+  .btn:hover { border-color: var(--ink-soft); }
+  .btn.primary { background: var(--carbon); border-color: var(--carbon); color: var(--sheet); font-weight: 500; }
+  .btn.done { color: var(--ok); font-weight: 500; }
+  .btn.skip { color: var(--bad); }
+  .btn kbd { margin-left: 6px; }
+
+  .context { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 40px; padding: 34px 0 60px;
+             max-width: 1040px; }
+  .context h2 { font-size: 19px; margin: 0 0 10px; letter-spacing: -.01em; }
+  .context h3 { font-size: 14px; margin: 18px 0 6px; }
+  .context p, .context li { max-width: 68ch; }
+  .context ul, .context ol { margin: 0; padding-left: 20px; }
+  .context li { margin-bottom: 6px; }
+  .context .when { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .build { border-top: 3px solid var(--ink); padding-top: 12px; }
+  .build .title { font: 500 21px/1.3 var(--serif); margin: 0 0 8px; }
+  details summary { cursor: pointer; color: var(--ink-soft); }
+
+  .empty { max-width: 34em; padding: 18vh 0; }
+  .empty h1 { font-size: 26px; margin: 0 0 8px; }
+
+  .toast { position: fixed; left: 50%; bottom: 74px; transform: translate(-50%, 8px); opacity: 0; pointer-events: none;
+           background: var(--ink); color: var(--desk); padding: 8px 14px; border-radius: 6px; font-size: 14px;
+           transition: opacity .15s, transform .15s; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 1100px) {
+    .proof { grid-template-columns: minmax(0, 1fr); }
+    .margin { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .context { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .queue { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); padding-bottom: 0; }
+    .leads { display: flex; overflow-x: auto; padding: 0; }
+    .leads li { flex: none; }
+    .leads a { border-left: 0; border-bottom: 3px solid transparent; padding: 10px 16px; }
+    .leads a[aria-current="true"] { border-bottom-color: var(--carbon); }
+    .runs, .keys { display: none; }
+    main { padding-top: 22px; }
+    .lead-head h1 { font-size: 26px; }
+    .sheet { padding: 18px 18px 24px; margin: 0 -8px; }
+    .field { grid-template-columns: 54px minmax(0, 1fr); }
+    .field .tag, .field .btn { grid-column: 2; justify-self: start; }
+    .letter { font-size: 17px; }
+    .btn kbd { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="queue">
+    <div class="brand">Applier</div>
+    <nav class="tabs" aria-label="Filter">
+      {% for key, label in [("pending", "To send"), ("done", "Done"), ("skipped", "Skipped"), ("all", "All")] %}
+        <a href="?show={{ key }}" {% if show == key %}aria-current="page"{% endif %}>{{ label }}{% if key != "all" %} <span class="n" data-count="{{ key }}">{{ counts.get(key, 0) }}</span>{% endif %}</a>
+      {% endfor %}
+    </nav>
+    <ul class="leads">
+      {% for l in leads %}
+      <li><a href="#lead={{ l.id }}" data-id="{{ l.id }}" class="is-{{ l.outreach }}">
+        <span class="name">{% if l.drafted_at >= new_since %}<span class="dot" title="Drafted in the last 24 hours"></span>{% endif %}{{ l.name }}</span>
+        <span class="meta">Fit {{ l.fit_score }}, {{ {"yc": "YC", "funded": "funded", "gcc": "GCC"}.get(l.category, l.category) }}</span>
+      </a></li>
+      {% endfor %}
+    </ul>
+    <div class="runs">
+      {% for kind, label in [("watch", "Scouting"), ("daily", "Drafting")] %}{% set r = runs[kind] %}
+        <p class="{{ 'failed' if r and r.ok == 0 }}" title="{{ r.summary if r else '' }}">{{ label }} {% if not r %}hasn't run yet{% elif r.ok == 0 %}failed {{ ago(r.started_at) }}{% elif not r.finished_at %}is running now{% else %}ran {{ ago(r.started_at) }}{% endif %}</p>
+      {% endfor %}
+      <p class="keys"><kbd>j</kbd> <kbd>k</kbd> move <kbd>c</kbd> copy <kbd>d</kbd> done <kbd>s</kbd> skip</p>
+    </div>
+  </aside>
+
+  <main>
+  {% if not leads %}
+    <div class="empty">
+      {% if show == "pending" %}
+        <h1>Nothing to send tonight</h1>
+        <p class="soft">New drafts are written every day at 1 pm. To make some now, run <code>python run.py daily</code>.</p>
+      {% else %}
+        <h1>Nothing here yet</h1>
+        <p class="soft">Leads you mark from the <a href="?show=pending">To send</a> list show up here.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% for l in leads %}{% set r = l.research %}
+  <article class="lead" id="lead-{{ l.id }}" data-id="{{ l.id }}" data-status="{{ l.outreach }}" hidden>
+    <header class="lead-head">
+      <h1>{% if l.website %}<a href="{{ l.website }}" target="_blank" rel="noopener">{{ l.name }}</a>{% else %}{{ l.name }}{% endif %}</h1>
+      <div class="facts">
+        <span class="fit">Fit {{ l.fit_score }}/10</span>
+        {% if l.source_url %}<a href="{{ l.source_url }}" target="_blank" rel="noopener">{{ l.source }}</a>{% else %}<span>{{ l.source }}</span>{% endif %}
+        {% if l.funding %}<span>{{ l.funding }}</span>{% endif %}
+        {% if r.stage_and_size %}<span>{{ r.stage_and_size }}</span>{% endif %}
+        {% if r.hiring_in_india_or_remote and r.hiring_in_india_or_remote != "unknown" %}<span>Hiring in India or remote: {{ r.hiring_in_india_or_remote }}</span>{% endif %}
+      </div>
+    </header>
+
+    <div class="proof">
+      <div class="sheet">
+        <div class="field">
+          <span>To</span>
+          <select class="contact" aria-label="Recipient">
+            {% for c in l.contacts %}
+            <option value="{{ c.id }}" data-email="{{ c.email or '' }}" data-name="{{ c.name or '' }}"
+                    data-status="{{ c.email_status }}" data-li="{{ c.linkedin or '' }}" {{ "selected" if c.id == l.contact_id }}>
+              {{ c.name or "Shared inbox" }}{% if c.role %}, {{ c.role }}{% endif %} ({{ c.email or "no email" }})
+            </option>
+            {% endfor %}
+            {% if not l.contacts %}<option value="">No contacts found</option>{% endif %}
+          </select>
+          <span class="tag contact-status"></span>
+        </div>
+        <div class="field">
+          <span>Subject</span>
+          <input class="subject" value="{{ l.subject }}" aria-label="Subject">
+        </div>
+        <div class="letter" contenteditable="plaintext-only" spellcheck="true" aria-label="Email body"
+             data-template="{{ l.body }}" data-hook="{{ l.hook }}"></div>
+        {% if signature %}<div class="signature">{{ signature }}</div>{% endif %}
+      </div>
+
+      <aside class="margin">
+        {% if l.rec.hook_basis %}
+        <section class="why">
+          <h2>Why this opening</h2>
+          <p>{{ l.rec.hook_basis }}</p>
+        </section>
+        {% endif %}
+        {% if l.checks %}
+        <section>
+          <h2>Check before sending</h2>
+          <ul class="checks">
+            {% for c in l.checks %}<li><label><input type="checkbox"><span>{{ c }}</span></label></li>{% endfor %}
+          </ul>
+        </section>
+        {% endif %}
+        <section>
+          <h2>About this address</h2>
+          <p class="contact-note soft"></p>
+        </section>
+        <section>
+          <h2>Notes</h2>
+          <input class="notes" value="{{ l.notes or '' }}" placeholder="Follow up Friday, also sent on LinkedIn…" aria-label="Notes">
+        </section>
+      </aside>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" data-copy="body">Copy email<kbd>c</kbd></button>
+      <button class="btn" data-copy="email">Copy address</button>
+      <button class="btn" data-copy="subject">Copy subject</button>
+      <a class="btn gmail" target="_blank" rel="noopener">Open in Gmail</a>
+      <span class="spacer"></span>
+      <button class="btn done" data-set="done">Done<kbd>d</kbd></button>
+      <button class="btn skip" data-set="skipped">Skip<kbd>s</kbd></button>
+      <button class="btn" data-set="pending">Not done</button>
+    </div>
+
+    <div class="context">
+      <section>
+        <h2>What they do</h2>
+        <p>{{ r.summary or l.one_liner }}</p>
+        {% if r.tech_stack %}<p class="soft">Stack: {{ r.tech_stack|join(", ") }}</p>{% endif %}
+        {% if r.current_challenges %}<h3>What they're working on</h3>
+          <ul>{% for c in r.current_challenges %}<li>{{ c }}</li>{% endfor %}</ul>{% endif %}
+        {% if r.signals %}<h3>Recent signals</h3>
+          <ul>{% for s in r.signals[:6] %}<li>{% if s.date %}<span class="when">{{ s.date }}</span> {% endif %}{% if s.who %}{{ s.who }}: {% endif %}{{ s.what }}{% if s.url %} <a href="{{ s.url }}" target="_blank" rel="noopener">Source</a>{% endif %}</li>{% endfor %}</ul>{% endif %}
+        {% if r.open_roles %}<h3>Open roles</h3><p>{{ r.open_roles|join(", ") }}</p>{% endif %}
+        <h3>Why it fits you</h3><p>{{ l.fit_reason }}</p>
+        {% if r.sources %}<h3>Sources</h3>
+          <details><summary>{{ r.sources|length }} pages read during research</summary>
+            <ul>{% for s in r.sources %}<li><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.title or s.url }}</a></li>{% endfor %}</ul>
+          </details>{% endif %}
+      </section>
+      {% if l.rec.title %}
+      <section class="build">
+        <h2>Build this before you hear back</h2>
+        <p class="title">{{ l.rec.title }}</p>
+        <p>{{ l.rec.why }}</p>
+        {% if l.rec.steps %}<ol>{% for s in l.rec.steps %}<li>{{ s }}</li>{% endfor %}</ol>{% endif %}
+        {% if l.rec.time_needed %}<p class="soft">Takes about {{ l.rec.time_needed }}</p>{% endif %}
+      </section>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+  </main>
+</div>
+<div class="toast" role="status" aria-live="polite"></div>
+
+<script>
+const SIGNATURE = {{ signature|tojson }};
+const STATUS_NOTE = {
+  verified: "Hunter confirmed this mailbox exists.",
+  likely: "Seen by Hunter or published online, but not confirmed.",
+  guessed: "Guessed from the company's email pattern. Check it, or message them on LinkedIn instead.",
+  none: "No email found. Reach out on LinkedIn.",
+};
+const STATUS_TAG = {verified: "Verified", likely: "Likely", guessed: "Guessed", none: "No email"};
+
+const toastEl = document.querySelector(".toast");
+let toastTimer;
+const toast = (msg) => {
+  toastEl.textContent = msg; toastEl.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1400);
+};
+const save = (id, data) => fetch(`/api/lead/${id}`, {
+  method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data),
+});
+const firstName = (name) => (name || "").trim().split(/\s+/)[0] || "there";
+const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+
+const leads = [...document.querySelectorAll(".lead")];
+const links = [...document.querySelectorAll(".leads a")];
+
+function setupLead(lead) {
+  const id = lead.dataset.id;
+  const sel = lead.querySelector(".contact"), subject = lead.querySelector(".subject");
+  const letter = lead.querySelector(".letter"), hook = letter.dataset.hook;
+  const opt = () => sel.selectedOptions[0] || {dataset: {}};
+
+  // The body is stored with a {first_name} placeholder. The hook gets the marker highlight
+  // for as long as the text still contains it.
+  const render = (text) => {
+    const i = hook ? text.indexOf(hook) : -1;
+    letter.innerHTML = i < 0 ? escapeHtml(text)
+      : escapeHtml(text.slice(0, i)) + "<mark>" + escapeHtml(hook) + "</mark>" + escapeHtml(text.slice(i + hook.length));
+  };
+  const fullText = () => letter.innerText.trim() + (SIGNATURE ? "\n\n" + SIGNATURE : "");
+  render(letter.dataset.template.replace("{first_name}", firstName(opt().dataset.name)));
+
+  const refresh = () => {
+    const o = opt().dataset, st = o.status || "none";
+    const tag = lead.querySelector(".contact-status");
+    tag.textContent = STATUS_TAG[st] || ""; tag.className = `tag contact-status status-${st}`;
+    lead.querySelector(".contact-note").innerHTML = escapeHtml(STATUS_NOTE[st] || "") +
+      (o.li ? ` <a href="${escapeHtml(o.li)}" target="_blank" rel="noopener">LinkedIn profile</a>` : "");
+    lead.querySelector(".gmail").href = "https://mail.google.com/mail/?view=cm&fs=1" +
+      `&to=${encodeURIComponent(o.email || "")}&su=${encodeURIComponent(subject.value)}&body=${encodeURIComponent(fullText())}`;
+  };
+  refresh();
+
+  sel.addEventListener("change", () => {
+    render(letter.innerText.replace(/^Hi [^,\n]*,/, `Hi ${firstName(opt().dataset.name)},`));
+    save(id, {contact_id: Number(sel.value)}); refresh(); toast("Recipient changed");
+  });
+  subject.addEventListener("change", () => { save(id, {subject: subject.value}); refresh(); toast("Subject saved"); });
+  letter.addEventListener("input", refresh);
+  letter.addEventListener("blur", () => {
+    save(id, {body: letter.innerText.trim().replace(/^Hi [^,\n]*,/, "Hi {first_name},")});
+    render(letter.innerText.trim()); refresh();
+  });
+  lead.querySelector(".notes").addEventListener("change", (e) => { save(id, {notes: e.target.value}); toast("Note saved"); });
+
+  lead.copy = async (what) => {
+    const text = {email: opt().dataset.email, subject: subject.value, body: fullText()}[what] || "";
+    await navigator.clipboard.writeText(text);
+    toast({email: "Address copied", subject: "Subject copied", body: "Email copied"}[what]);
+  };
+  lead.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => lead.copy(b.dataset.copy)));
+  lead.setStatus = async (status) => {
+    await save(id, {outreach: status});
+    const prev = lead.dataset.status; lead.dataset.status = status;
+    const link = links.find((a) => a.dataset.id === id); link.className = `is-${status}`;
+    for (const [key, delta] of [[prev, -1], [status, 1]]) {
+      const n = document.querySelector(`[data-count="${key}"]`); if (n) n.textContent = Number(n.textContent) + delta;
+    }
+    toast({done: "Marked done", skipped: "Skipped", pending: "Marked not done"}[status]);
+    if (status !== "pending") next(1, true);
+  };
+  lead.querySelectorAll("[data-set]").forEach((b) => b.addEventListener("click", () => lead.setStatus(b.dataset.set)));
+}
+leads.forEach(setupLead);
+
+let current = 0;
+function show(i) {
+  if (!leads.length) return;
+  current = (i + leads.length) % leads.length;
+  leads.forEach((l, j) => l.hidden = j !== current);
+  links.forEach((a, j) => a.setAttribute("aria-current", j === current ? "true" : "false"));
+  // "#lead=ID" deliberately matches no element id, so the browser never jumps down the page to it.
+  history.replaceState(null, "", `${location.search}#lead=${leads[current].dataset.id}`);
+  // Scroll only the list (sideways on phones), never the page.
+  const list = document.querySelector(".leads"), item = links[current].parentElement;
+  if (list.scrollWidth > list.clientWidth) list.scrollLeft = item.offsetLeft - 16;
+  else if (item.offsetTop < list.scrollTop || item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight)
+    list.scrollTop = item.offsetTop - 8;
+  window.scrollTo({top: 0});
+}
+// After done/skip, jump to the next lead that still needs sending.
+function next(step, skipHandled = false) {
+  for (let k = 1; k <= leads.length; k++) {
+    const i = (current + step * k + leads.length) % leads.length;
+    if (!skipHandled || leads[i].dataset.status === "pending") return show(i);
+  }
+}
+links.forEach((a, i) => a.addEventListener("click", (e) => { e.preventDefault(); show(i); }));
+const fromHash = leads.findIndex((l) => `#lead=${l.dataset.id}` === location.hash);
+show(fromHash >= 0 ? fromHash : 0);
+
+document.addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest("input, select, textarea, [contenteditable]")) return;
+  const lead = leads[current]; if (!lead) return;
+  const action = {j: () => next(1), k: () => next(-1), ArrowDown: () => next(1), ArrowUp: () => next(-1),
+                  c: () => lead.copy("body"), d: () => lead.setStatus("done"), s: () => lead.setStatus("skipped"),
+                  u: () => lead.setStatus("pending")}[e.key];
+  if (action) { e.preventDefault(); action(); }
+});
+</script>
+</body>
+</html>

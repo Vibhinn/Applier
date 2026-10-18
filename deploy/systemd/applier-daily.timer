@@ -1,0 +1,9 @@
+[Unit]
+Description=Draft today's emails in the afternoon so they're ready by evening
+
+[Timer]
+OnCalendar=*-*-* 13:00:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

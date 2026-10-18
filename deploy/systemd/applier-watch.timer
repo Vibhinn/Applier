@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Applier scouting every 3 hours (feeds only keep their latest items)
+
+[Timer]
+OnCalendar=*-*-* 00/3:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

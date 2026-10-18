@@ -1,0 +1,9 @@
+[Unit]
+Description=Applier: scout news/YC and rank new companies
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@APP@
+ExecStart=@APP@/.venv/bin/python run.py watch
+TimeoutStartSec=30min

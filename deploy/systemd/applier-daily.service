@@ -1,0 +1,11 @@
+[Unit]
+Description=Applier: research + contacts + drafts for today's top companies
+# If both are started together (first install), scout first so there's something to draft.
+After=applier-watch.service
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@APP@
+ExecStart=@APP@/.venv/bin/python run.py daily
+TimeoutStartSec=2h

@@ -1,0 +1,12 @@
+[Unit]
+Description=Applier dashboard
+After=network-online.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@APP@
+ExecStart=@APP@/.venv/bin/python run.py dashboard --host 127.0.0.1 --port 5050
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
